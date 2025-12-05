@@ -2,6 +2,8 @@ package com.example.pathtracker
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -16,8 +18,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.pathtracker.ui.theme.PathtrackerTheme
+import java.util.logging.Logger
 
 class MainActivity : ComponentActivity() {
+    private lateinit var locationManager: LocationManager
+    private lateinit var locationListener: LocationListener
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -31,9 +36,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (!isLocationPermissionGranted()) {
-            requestLocationPermission()
-        }
+        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        locationListener = LocationListener { p0 -> Logger.getGlobal().info("LOlOLO $p0") }
+        requestLocationPermissionIfNecessary()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        requestLocationPermissionIfNecessary()
+        startLocationUpdates()
     }
 
     /**
@@ -49,7 +60,8 @@ class MainActivity : ComponentActivity() {
         Manifest.permission.ACCESS_COARSE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
 
-    private fun requestLocationPermission() {
+    private fun requestLocationPermissionIfNecessary() {
+        if (isLocationPermissionGranted()) return
         val locationPermissionRequest =
             registerForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions(),
@@ -72,6 +84,15 @@ class MainActivity : ComponentActivity() {
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION,
             ),
+        )
+    }
+
+    private fun startLocationUpdates() {
+        locationManager.requestLocationUpdates(
+            LocationManager.GPS_PROVIDER,
+            1000,
+            10f,
+            locationListener
         )
     }
 }
