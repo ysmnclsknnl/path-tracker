@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.pathtracker.ui.theme.PathtrackerTheme
-import java.util.logging.Logger
 
 class MainActivity : ComponentActivity() {
     private lateinit var locationManager: LocationManager
@@ -37,14 +36,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
-        locationListener = LocationListener { p0 -> Logger.getGlobal().info("LOlOLO $p0") }
-        requestLocationPermissionIfNecessary()
+        locationListener = LocationListener {}
+        if (!isLocationPermissionGranted()) requestLocationPermission()
     }
 
     override fun onResume() {
         super.onResume()
-        requestLocationPermissionIfNecessary()
-        startLocationUpdates()
+        if (isLocationPermissionGranted()) startLocationUpdates()
     }
 
     /**
@@ -60,8 +58,7 @@ class MainActivity : ComponentActivity() {
         Manifest.permission.ACCESS_COARSE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
 
-    private fun requestLocationPermissionIfNecessary() {
-        if (isLocationPermissionGranted()) return
+    private fun requestLocationPermission() {
         val locationPermissionRequest =
             registerForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions(),
