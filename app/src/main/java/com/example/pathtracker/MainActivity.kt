@@ -1,7 +1,6 @@
 package com.example.pathtracker
 
 import android.Manifest
-import android.content.pm.PackageManager
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
@@ -16,12 +15,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
+import com.example.pathtracker.location.isLocationPermissionGranted
+import com.example.pathtracker.location.startLocationUpdates
 import com.example.pathtracker.ui.theme.PathtrackerTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var locationManager: LocationManager
     private lateinit var locationListener: LocationListener
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -42,21 +43,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (isLocationPermissionGranted()) startLocationUpdates()
+        if (isLocationPermissionGranted()) locationManager.startLocationUpdates(locationListener)
     }
 
-    /**
-     * Method to verify permissions:
-     * - [Manifest.permission.ACCESS_FINE_LOCATION]
-     * - [Manifest.permission.ACCESS_COARSE_LOCATION]
-     */
-    private fun isLocationPermissionGranted() = ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
-        this,
-        Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
+    override fun onPause() {
+        super.onPause()
+        locationManager.removeUpdates(locationListener)
+    }
 
     private fun requestLocationPermission() {
         val locationPermissionRequest =
@@ -81,15 +74,6 @@ class MainActivity : ComponentActivity() {
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION,
             ),
-        )
-    }
-
-    private fun startLocationUpdates() {
-        locationManager.requestLocationUpdates(
-            LocationManager.GPS_PROVIDER,
-            1000,
-            10f,
-            locationListener
         )
     }
 }
