@@ -25,14 +25,14 @@ class MainActivity : ComponentActivity() {
             PathtrackerTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     MainScreen(
-                        name = "Path tracker",
+                        message = "Welcome to Path tracker",
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
             }
         }
-        if (!areLocationPermissionsGranted()) {
-            requestLocationPermissions()
+        if (!isLocationPermissionGranted()) {
+            requestLocationPermission()
         }
     }
 
@@ -41,32 +41,32 @@ class MainActivity : ComponentActivity() {
      * - [Manifest.permission.ACCESS_FINE_LOCATION]
      * - [Manifest.permission.ACCESS_COARSE_LOCATION]
      */
-    private fun areLocationPermissionsGranted() = ContextCompat.checkSelfPermission(
+    private fun isLocationPermissionGranted() = ContextCompat.checkSelfPermission(
         this,
         Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(
+    ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
         this,
         Manifest.permission.ACCESS_COARSE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
 
-    private val locationPermissionRequest =
-        registerForActivityResult(
-            ActivityResultContracts.RequestMultiplePermissions(),
-        ) { permissions ->
-            if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true &&
-                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-            ) {
-                // Show user location
-            } else {
-                Toast.makeText(
-                    this,
-                    getString(R.string.location_permission_denied),
-                    Toast.LENGTH_SHORT,
-                ).show()
+    private fun requestLocationPermission() {
+        val locationPermissionRequest =
+            registerForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions(),
+            ) { permissions ->
+                if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
+                    permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
+                ) {
+                    // Show user location
+                } else {
+                    Toast.makeText(
+                        this,
+                        getString(R.string.location_permission_denied),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
             }
-        }
 
-    private fun requestLocationPermissions() {
         locationPermissionRequest.launch(
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
@@ -77,9 +77,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(name: String, modifier: Modifier = Modifier) {
+fun MainScreen(message: String, modifier: Modifier = Modifier) {
     Text(
-        text = "Hello $name!",
+        text = "$message!",
         modifier = modifier
     )
 }
