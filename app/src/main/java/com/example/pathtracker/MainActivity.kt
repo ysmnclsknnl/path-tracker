@@ -18,7 +18,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.example.pathtracker.location.createLocationRequest
 import com.example.pathtracker.location.isLocationPermissionGranted
+import com.example.pathtracker.location.requestLocationPermission
 import com.example.pathtracker.ui.theme.PathtrackerTheme
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -27,12 +29,27 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
-import com.google.android.gms.location.Priority
 
 class MainActivity : ComponentActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
     private val locationRequest = createLocationRequest()
+    private val locationPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { permissions ->
+            if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
+                permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
+            ) {
+                checkLocationSettings()
+            } else {
+                Toast.makeText(
+                    this,
+                    getString(R.string.location_permission_denied),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    private var isLocationTracked = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,7 +66,7 @@ class MainActivity : ComponentActivity() {
         }
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         if (!isLocationPermissionGranted()) {
-            requestLocationPermission()
+            locationPermissionLauncher.requestLocationPermission()
         }
         else {
             checkLocationSettings()
@@ -72,11 +89,11 @@ class MainActivity : ComponentActivity() {
         val settingsBuilder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
         val client = LocationServices.getSettingsClient(this)
        client.checkLocationSettings(settingsBuilder.build())
-        .addOnSuccessListener {
-           startLocationUpdates(locationRequest)
-        }
-
-        .addOnFailureListener { exception ->
+           .addOnSuccessListener {
+               startLocationUpdates(locationRequest)
+               isLocationTracked = true
+           }
+           .addOnFailureListener { exception ->
             if (exception is ResolvableApiException){
                 try {
                     // Show the dialog by calling startResolutionForResult(),
@@ -91,7 +108,7 @@ class MainActivity : ComponentActivity() {
     }
     override fun onResume() {
         super.onResume()
-        if (isLocationPermissionGranted()) startLocationUpdates(locationRequest)
+        if(!isLocationTracked && isLocationPermissionGranted()) startLocationUpdates(locationRequest)
     }
 
     override fun onPause() {
@@ -112,39 +129,29 @@ class MainActivity : ComponentActivity() {
             else Toast.makeText(this, "Location settings are not satisfied", Toast.LENGTH_SHORT).show()
         }
     }
-    private fun requestLocationPermission() {
-        val locationPermissionRequest =
-            registerForActivityResult(
-                ActivityResultContracts.RequestMultiplePermissions(),
-            ) { permissions ->
-                if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
-                    permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
-                ) {
-                 checkLocationSettings()
-                } else {
-                    Toast.makeText(
-                        this,
-                        getString(R.string.location_permission_denied),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-            }
 
-        locationPermissionRequest.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-            ),
-        )
-    }
     private fun startLocationUpdates(locationRequest: LocationRequest) {
-        fusedLocationClient.requestLocationUpdates(locationRequest,
-            locationCallback,
-            Looper.getMainLooper())
+        if (!isLocationPermissionGranted()) {
+            Log.w("MainActivity", "Location permission is not granted. Cannot request location updates.")
+            return
+        }
+        if(isLocationTracked) return
+
+        try {
+            fusedLocationClient.requestLocationUpdates(locationRequest,
+                locationCallback,
+                Looper.getMainLooper())
+        }
+        catch (e: SecurityException) {
+            Log.e("MainActivity", "Security Exception ${e.message}")
+        }
     }
 
     private fun stopLocationUpdates() {
-        fusedLocationClient.removeLocationUpdates(locationCallback)
+        if(::fusedLocationClient.isInitialized && ::locationCallback.isInitialized) {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
+
     }
     private companion object {
         const val REQUEST_CHECK_SETTINGS = 1001
@@ -158,7 +165,3 @@ fun MainScreen(message: String, modifier: Modifier = Modifier) {
         modifier = modifier
     )
 }
-
-fun createLocationRequest() = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
-        .setMinUpdateIntervalMillis(1000)
-        .build()
