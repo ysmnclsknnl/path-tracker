@@ -1,9 +1,11 @@
 package com.example.pathtracker
 
 import android.Manifest
-import android.location.LocationListener
-import android.location.LocationManager
+import android.app.ComponentCaller
+import android.content.Intent
+import android.content.IntentSender
 import android.os.Bundle
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,12 +18,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.example.pathtracker.location.isLocationPermissionGranted
-import com.example.pathtracker.location.startLocationUpdates
 import com.example.pathtracker.ui.theme.PathtrackerTheme
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
 
 class MainActivity : ComponentActivity() {
-    private lateinit var locationManager: LocationManager
-    private lateinit var locationListener: LocationListener
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationCallback: LocationCallback
+    private val locationRequest = createLocationRequest()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,21 +46,70 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
-        locationListener = LocationListener {}
-        if (!isLocationPermissionGranted()) requestLocationPermission()
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        setUpLocationCallBack()
+        if (!isLocationPermissionGranted()) {
+            requestLocationPermission()
+        }
+        else {
+            checkLocationSettings()
+        }
     }
 
+    private fun setUpLocationCallBack() {
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                result.locations.forEach { location ->
+                    // updateUI with location data for now just print it
+                }
+            }
+        }
+    }
+
+    private fun checkLocationSettings() {
+        val settingsBuilder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+        val client = LocationServices.getSettingsClient(this)
+       client.checkLocationSettings(settingsBuilder.build())
+        .addOnSuccessListener {
+           stopLocationUpdates()
+        }
+
+        .addOnFailureListener { exception ->
+            if (exception is ResolvableApiException){
+                try {
+                    // Show the dialog by calling startResolutionForResult(),
+                    // and check the result in onActivityResult().
+                    exception.startResolutionForResult(this,
+                        REQUEST_CHECK_SETTINGS)
+                } catch (sendEx: IntentSender.SendIntentException) {
+                    // Ignore the error.
+                }
+            }
+        }
+    }
     override fun onResume() {
         super.onResume()
-        if (isLocationPermissionGranted()) locationManager.startLocationUpdates(locationListener)
+        if (isLocationPermissionGranted()) startLocationUpdates(locationRequest)
     }
 
     override fun onPause() {
         super.onPause()
-        locationManager.removeUpdates(locationListener)
+        stopLocationUpdates()
     }
 
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?,
+        caller: ComponentCaller
+    ) {
+        super.onActivityResult(requestCode, resultCode, data, caller)
+        if(requestCode == REQUEST_CHECK_SETTINGS)
+        {
+            if(resultCode == RESULT_OK) startLocationUpdates(locationRequest)
+            else Toast.makeText(this, "Location settings are not satisfied", Toast.LENGTH_SHORT).show()
+        }
+    }
     private fun requestLocationPermission() {
         val locationPermissionRequest =
             registerForActivityResult(
@@ -59,7 +118,7 @@ class MainActivity : ComponentActivity() {
                 if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
                     permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
                 ) {
-                    // Show user location
+                 checkLocationSettings()
                 } else {
                     Toast.makeText(
                         this,
@@ -76,6 +135,18 @@ class MainActivity : ComponentActivity() {
             ),
         )
     }
+    private fun startLocationUpdates(locationRequest: LocationRequest) {
+        fusedLocationClient.requestLocationUpdates(locationRequest,
+            locationCallback,
+            Looper.getMainLooper())
+    }
+
+    private fun stopLocationUpdates() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+    }
+    private companion object {
+        const val REQUEST_CHECK_SETTINGS = 1001
+    }
 }
 
 @Composable
@@ -85,3 +156,7 @@ fun MainScreen(message: String, modifier: Modifier = Modifier) {
         modifier = modifier
     )
 }
+
+fun createLocationRequest() = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
+        .setMinUpdateIntervalMillis(5000)
+        .build()
