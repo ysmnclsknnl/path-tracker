@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentSender
 import android.os.Bundle
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -47,13 +48,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        setUpLocationCallBack()
         if (!isLocationPermissionGranted()) {
             requestLocationPermission()
         }
         else {
             checkLocationSettings()
         }
+        setUpLocationCallBack()
     }
 
     private fun setUpLocationCallBack() {
@@ -61,6 +62,7 @@ class MainActivity : ComponentActivity() {
             override fun onLocationResult(result: LocationResult) {
                 result.locations.forEach { location ->
                     // updateUI with location data for now just print it
+                    Log.d("Main Activity", "latitude ${location.latitude} longitude ${location.longitude}")
                 }
             }
         }
@@ -71,7 +73,7 @@ class MainActivity : ComponentActivity() {
         val client = LocationServices.getSettingsClient(this)
        client.checkLocationSettings(settingsBuilder.build())
         .addOnSuccessListener {
-           stopLocationUpdates()
+           startLocationUpdates(locationRequest)
         }
 
         .addOnFailureListener { exception ->
@@ -157,6 +159,6 @@ fun MainScreen(message: String, modifier: Modifier = Modifier) {
     )
 }
 
-fun createLocationRequest() = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
-        .setMinUpdateIntervalMillis(5000)
+fun createLocationRequest() = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
+        .setMinUpdateIntervalMillis(1000)
         .build()
